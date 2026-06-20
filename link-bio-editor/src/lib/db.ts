@@ -1,34 +1,35 @@
-import { neon } from '@neondatabase/serverless'
+import postgres from 'postgres'
 import type { Template, TemplateInput } from './types'
 
 const FOOTER_LOGO_DEFAULT = 'https://pub-db8ed4fb33634589a6ce5fb07e85cb46.r2.dev/logo/op7_dash_odc/logo_op7nexo.svg'
 const FOOTER_HREF_DEFAULT = 'https://www.instagram.com/op7franquias'
 const FOOTER_COPYRIGHT_DEFAULT = '© 2026 OP7 Nexo · Todos os direitos reservados'
 
+let _sql: ReturnType<typeof postgres> | null = null
 function getDb() {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('DATABASE_URL not set')
-  return neon(url)
+  if (!_sql) _sql = postgres(url, { ssl: 'require' })
+  return _sql
 }
 
 export async function initDb() {
   const sql = getDb()
   await sql`
     CREATE TABLE IF NOT EXISTS templates (
-      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      slug          TEXT UNIQUE NOT NULL,
-      name          TEXT NOT NULL,
-      logo_url      TEXT NOT NULL DEFAULT '',
-      headline      TEXT NOT NULL DEFAULT 'Cuidar do seu sorriso,',
-      subtitle_html TEXT NOT NULL DEFAULT '',
-      logo_width    INTEGER NOT NULL DEFAULT 170,
-      accent_color  TEXT NOT NULL DEFAULT '#A8D156',
-      ctas          JSONB NOT NULL DEFAULT '[]',
-      created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      slug            TEXT UNIQUE NOT NULL,
+      name            TEXT NOT NULL,
+      logo_url        TEXT NOT NULL DEFAULT '',
+      headline        TEXT NOT NULL DEFAULT 'Cuidar do seu sorriso,',
+      subtitle_html   TEXT NOT NULL DEFAULT '',
+      logo_width      INTEGER NOT NULL DEFAULT 170,
+      accent_color    TEXT NOT NULL DEFAULT '#A8D156',
+      ctas            JSONB NOT NULL DEFAULT '[]',
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `
-  // Idempotent migrations
   await sql`ALTER TABLE templates ADD COLUMN IF NOT EXISTS headline TEXT NOT NULL DEFAULT 'Cuidar do seu sorriso,'`
   await sql`ALTER TABLE templates ADD COLUMN IF NOT EXISTS logo_width INTEGER NOT NULL DEFAULT 170`
   await sql`ALTER TABLE templates ADD COLUMN IF NOT EXISTS accent_color TEXT NOT NULL DEFAULT '#A8D156'`
@@ -43,12 +44,11 @@ export async function initDb() {
   await sql`ALTER TABLE templates ADD COLUMN IF NOT EXISTS footer_copyright TEXT NOT NULL DEFAULT '© 2026 OP7 Nexo · Todos os direitos reservados'`
 }
 
-// Run migrations once per server instance, before any write.
 let migrated: Promise<void> | null = null
 function ensureMigrated() {
   if (!migrated) {
     migrated = initDb().catch((e) => {
-      migrated = null // allow retry on next write if init failed
+      migrated = null
       throw e
     })
   }
