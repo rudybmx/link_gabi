@@ -32,8 +32,15 @@ function FooterLogo({ url, href, width }: { url: string; href: string; width: nu
   return img
 }
 
+// Assets estáticos / nomes reservados que o rewrite (/:slug com ponto) captura por engano.
+const RESERVED_SLUGS = new Set([
+  'favicon.ico', 'favicon.png', 'robots.txt', 'sitemap.xml', 'manifest.json',
+  'apple-touch-icon.png', 'apple-touch-icon-precomposed.png',
+])
+
 export default async function LinkBioPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  if (RESERVED_SLUGS.has(slug.toLowerCase())) notFound()
   const template = await getTemplateBySlug(slug)
   if (!template) notFound()
 
