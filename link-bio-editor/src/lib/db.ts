@@ -63,22 +63,34 @@ function ensureMigrated() {
   return migrated
 }
 
+// O driver `postgres` pode devolver colunas jsonb como STRING (não parseada).
+// Normaliza `ctas` para sempre ser array — evita `ctas.map is not a function`
+// nos consumidores (editor, render público, export).
+function normalize(row: unknown): Template {
+  const t = row as Template & { ctas: unknown }
+  if (typeof t.ctas === 'string') {
+    try { t.ctas = JSON.parse(t.ctas) } catch { t.ctas = [] }
+  }
+  if (!Array.isArray(t.ctas)) t.ctas = []
+  return t as Template
+}
+
 export async function getAllTemplates(): Promise<Template[]> {
   const sql = getDb()
   const rows = await sql`SELECT * FROM ${tbl(sql)} ORDER BY updated_at DESC`
-  return rows as unknown as Template[]
+  return (rows as unknown[]).map(normalize)
 }
 
 export async function getTemplateById(id: string): Promise<Template | null> {
   const sql = getDb()
   const rows = await sql`SELECT * FROM ${tbl(sql)} WHERE id = ${id}`
-  return (rows[0] as unknown as Template) ?? null
+  return rows[0] ? normalize(rows[0]) : null
 }
 
 export async function getTemplateBySlug(slug: string): Promise<Template | null> {
   const sql = getDb()
   const rows = await sql`SELECT * FROM ${tbl(sql)} WHERE slug = ${slug}`
-  return (rows[0] as unknown as Template) ?? null
+  return rows[0] ? normalize(rows[0]) : null
 }
 
 // Defaults por tipo de modelo — espelham os do TemplateEditor.tsx.
@@ -118,7 +130,7 @@ export async function createTemplate(data: TemplateInput): Promise<Template> {
     )
     RETURNING *
   `
-  return rows[0] as unknown as Template
+  return normalize(rows[0])
 }
 
 export async function updateTemplate(id: string, data: Partial<TemplateInput>): Promise<Template | null> {
@@ -147,7 +159,7 @@ export async function updateTemplate(id: string, data: Partial<TemplateInput>): 
     WHERE id = ${id}
     RETURNING *
   `
-  return (rows[0] as unknown as Template) ?? null
+  return rows[0] ? normalize(rows[0]) : null
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
