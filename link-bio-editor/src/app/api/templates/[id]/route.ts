@@ -20,6 +20,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!updated) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json(updated)
   } catch (e) {
+    if ((e as { code?: string })?.code === '23505') {
+      return NextResponse.json({ error: 'Esse slug já existe. Escolha outro.' }, { status: 409 })
+    }
     return NextResponse.json({ error: String(e) }, { status: 500 })
   }
 }
