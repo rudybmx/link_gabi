@@ -9,7 +9,7 @@ let _sql: ReturnType<typeof postgres> | null = null
 function getDb() {
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('DATABASE_URL not set')
-  if (!_sql) _sql = postgres(url, { ssl: 'require' })
+  if (!_sql) _sql = postgres(url, { ssl: false })
   return _sql
 }
 
